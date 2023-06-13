@@ -1,6 +1,6 @@
 FROM golang:1.20-bullseye as builder
 
-WORKDir /app/src
+WORKDIR /app/src
 
 COPY go.mod go.sum .
 RUN go mod download && go mod verify
@@ -14,6 +14,8 @@ COPY --from=builder /app/bin/ /app/bin/
 
 COPY migrations /app/migrations
 
-EXPOSE 8080
+EXPOSE 4080 50080
+
+VOLUME [ "/app/sqlite", "/app/migrations" ]
 
 ENTRYPOINT ["/app/bin/server"]

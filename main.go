@@ -7,17 +7,21 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 
-	"github.com/trevatk/go-template/internal/db"
-	"github.com/trevatk/go-template/internal/domain"
-	"github.com/trevatk/go-template/internal/logging"
-	"github.com/trevatk/go-template/internal/port"
+	"github.com/trevatk/go-pkg/db"
+	"github.com/trevatk/go-pkg/logging"
+
+	"github.com/trevatk/go-chat/internal/domain"
+	"github.com/trevatk/go-chat/internal/port"
+	pb "github.com/trevatk/go-chat/proto/messenger/v1"
 )
 
 func main() {
@@ -25,10 +29,10 @@ func main() {
 	fxApp := fx.New(
 		fx.Provide(logging.New),
 		fx.Provide(db.NewSQLite),
-		fx.Provide(domain.NewPersonService),
 		fx.Provide(domain.NewBundle),
 		fx.Provide(port.NewHTTPServer),
-		fx.Provide(port.NewRouter),
+		fx.Provide(fx.Annotate(port.NewRouter, fx.As(new(http.Handler)))),
+		fx.Provide(port.NewGrpcServer),
 		fx.Invoke(registerHooks),
 	)
 
@@ -49,39 +53,60 @@ func main() {
 	}
 }
 
-func registerHooks(lc fx.Lifecycle, log *zap.Logger, handler http.Handler, sqlite *sql.DB) error {
+func registerHooks(lc fx.Lifecycle, log *zap.Logger, handler http.Handler, gSrv *port.GrpcServer, sqlite *sql.DB) error {
 
-	logger := log.Named("lifecycle").Sugar()
+	l := log.Named("lifecycle").Sugar()
 
-	port := os.Getenv("HTTP_SERVER_PORT")
-	if port == "" {
+	p1 := os.Getenv("HTTP_SERVER_PORT")
+	if p1 == "" {
 		return errors.New("$HTTP_SERVER_PORT is unset")
 	}
 
-	srv := &http.Server{
-		Addr:         ":" + port,
+	s1 := &http.Server{
+		Addr:         ":" + p1,
 		Handler:      handler,
 		ReadTimeout:  time.Second * 15,
 		WriteTimeout: time.Second * 15,
 		IdleTimeout:  time.Second * 15,
 	}
 
+	p2 := os.Getenv("GRPC_SERVER_PORT")
+	if p2 == "" {
+		return errors.New("$GRPC_SERVER_PORT is unset")
+	}
+
+	s2 := grpc.NewServer()
+	pb.RegisterMessengerServiceServer(s2, gSrv)
+
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) error {
 
-				logger.Info("execute database migration")
+				l.Info("execute database migration")
 
-				err := db.Migrate(sqlite)
-				if err != nil {
-					return fmt.Errorf("failed to execute database migration %v", err)
+				e := db.MigrateSQLite(sqlite)
+				if e != nil {
+					return fmt.Errorf("failed to execute database migration %v", e)
 				}
 
-				logger.Infof("start http server http://localhost:%s" + port)
+				l.Infof("start http server http://localhost:%s", p1)
 
 				go func() {
-					if err := srv.ListenAndServe(); err != nil {
-						logger.Fatalf("failed to start http server %v", err)
+					if e := s1.ListenAndServe(); e != nil {
+						l.Fatalf("failed to start http server %v", e)
+					}
+				}()
+
+				li, e := net.Listen("tcp", ":"+p2)
+				if e != nil {
+					return fmt.Errorf("unable to create network listener %v", e)
+				}
+
+				l.Infof("start gRPC server localhost:%s", p2)
+
+				go func() {
+					if e := s2.Serve(li); e != nil {
+						l.Fatalf("failed to start gRPC server %v", e)
 					}
 				}()
 
@@ -89,24 +114,27 @@ func registerHooks(lc fx.Lifecycle, log *zap.Logger, handler http.Handler, sqlit
 			},
 			OnStop: func(ctx context.Context) error {
 
-				var err error
+				var e error
 
-				logger.Info("close database connection")
+				l.Info("close database connection")
 
-				err = sqlite.Close()
-				if err != nil {
-					logger.Errorf("failed to close database connection %v", err)
+				e = sqlite.Close()
+				if e != nil {
+					l.Errorf("failed to close database connection %v", e)
 				}
 
-				logger.Info("shutdown http server")
+				l.Info("shutdown http server")
 
-				err = srv.Close()
-				if err != nil && !errors.Is(err, http.ErrServerClosed) {
-					logger.Errorf("failed to shutdown http server %v", err)
+				e = s1.Close()
+				if e != nil && !errors.Is(e, http.ErrServerClosed) {
+					l.Errorf("failed to shutdown http server %v", e)
 				}
+
+				l.Info("shutdown gRPC server")
+				s2.GracefulStop()
 
 				// redudant logging
-				return err
+				return e
 			},
 		},
 	)

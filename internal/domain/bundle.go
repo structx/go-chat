@@ -1,14 +1,20 @@
-// Package domain application layer of service
+// Package domain application layer
 package domain
 
-// Bundle service bundle
+import "database/sql"
+
+// Bundle domain service bundle
 type Bundle struct {
-	PersonService *PersonService
+	UserService      *UserService
+	MessengerService *MessengerService
+	ContactService   *ContactService
 }
 
 // NewBundle create new service bundle
-func NewBundle(personService *PersonService) *Bundle {
+func NewBundle(db *sql.DB) *Bundle {
 	return &Bundle{
-		PersonService: personService,
+		UserService:      newUserService(db),
+		MessengerService: newMessengerService(db),
+		ContactService:   newContactService(db),
 	}
 }

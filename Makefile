@@ -1,5 +1,5 @@
 build:
-	docker build -t trevatk/go-template:latest .
+	docker build -t trevatk/go-chat:latest .
 
 deps:
 	go mod tidy
@@ -7,3 +7,7 @@ deps:
 
 lint:
 	golangci-lint run
+
+rpc:
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+	proto/messenger/v1/messenger_v1.proto

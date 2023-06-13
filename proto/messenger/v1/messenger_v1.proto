@@ -1,0 +1,34 @@
+
+syntax = "proto3";
+
+option go_package = "github.com/trevatk/go-chat/proto/messenger.v1";
+
+package messenger;
+
+message Conversation {
+    string token = 1;
+    string conversation = 2;
+}
+
+message NewEnvelope {
+    string sender = 1;
+    string conversation = 2;
+    string message = 3;
+}
+
+enum SEND_ENVELOPE_STATUS {
+    ERROR = 0;
+    DELIVERED = 1;
+}
+
+message Envelope {
+    string uid = 1;
+    string sender = 2;
+    string message = 3;
+    SEND_ENVELOPE_STATUS status = 4;
+}
+
+service MessengerService {
+    rpc StreamEnvelopes (Conversation) returns (stream Envelope) {}
+    rpc SendEnvelope (stream NewEnvelope) returns (Envelope) {}
+}

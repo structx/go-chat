@@ -1,13 +1,16 @@
+
 version: 2
 sql:
   - engine: sqlite
-    schema: migrations/001_persons.up.sql
-    queries: sqlc/queries/persons.sql
+    schema: migrations/001_initial_schema.up.sql
+    queries: sqlc/queries
     gen:
       go: 
-        package: persons
-        out: internal/repository/persons
+        package: repository
+        out: internal/repository
         emit_prepared_queries: true
         emit_empty_slices: true
         emit_result_struct_pointers: true
         emit_params_struct_pointers: true
+
+        
