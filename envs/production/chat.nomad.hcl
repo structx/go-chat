@@ -80,7 +80,7 @@ job "chat" {
 
             env {
                 HTTP_SERVER_PORT = "${NOMAD_PORT_http}"
-		        GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
+		GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
                 SQLITE_DSN = "/app/sqlite/chat.db"
                 SQLITE_MIGRATIONS_DIR = "/app/migrations"
             }
