@@ -14,8 +14,6 @@ COPY --from=builder /app/bin/ /app/bin/
 
 COPY migrations /app/migrations
 
-EXPOSE 4080 50080
-
 VOLUME [ "/app/sqlite", "/app/migrations" ]
 
 ENTRYPOINT ["/app/bin/server"]

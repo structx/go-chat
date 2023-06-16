@@ -1,5 +1,5 @@
 build:
-	docker build -t trevatk/go-chat:latest .
+	docker build -t trevatk/go-chat:v0.0.1 .
 
 deps:
 	go mod tidy
