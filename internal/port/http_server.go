@@ -14,20 +14,19 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"go.uber.org/zap"
 
 	"github.com/trevatk/go-chat/internal/domain"
+	"github.com/trevatk/go-pkg/logging"
 )
 
 // HTTPServer exposed endpoints
 type HTTPServer struct {
-	log    *zap.SugaredLogger
 	bundle *domain.Bundle
 }
 
 // NewHTTPServer create new http server instance
-func NewHTTPServer(bundle *domain.Bundle, log *zap.Logger) *HTTPServer {
-	return &HTTPServer{bundle: bundle, log: log.Named("http server").Sugar()}
+func NewHTTPServer(bundle *domain.Bundle) *HTTPServer {
+	return &HTTPServer{bundle: bundle}
 }
 
 // NewRouter create new chi implementation of http.ServeMux
@@ -129,11 +128,13 @@ func newUserResponse(user *domain.User) *NewUserResponse {
 
 func (h *HTTPServer) createUser(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &NewUserParams{}
 	e := render.Bind(r, p)
 	if e != nil {
 		c := http.StatusBadRequest
-		h.log.Errorf("unable to parse request create user body %v", e)
+		logging.FromContext(ctx).Errorf("unable to parse request create user body %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -143,9 +144,9 @@ func (h *HTTPServer) createUser(w http.ResponseWriter, r *http.Request) {
 		Email:    p.Email,
 	}
 
-	u, e := h.bundle.UserService.Create(r.Context(), nu)
+	u, e := h.bundle.UserService.Create(ctx, nu)
 	if e != nil {
-		h.log.Errorf("unable to create new user %v", e)
+		logging.FromContext(ctx).Errorf("unable to create new user %v", e)
 
 		if e == domain.ErrUniqueExists {
 			c := http.StatusConflict
@@ -161,25 +162,27 @@ func (h *HTTPServer) createUser(w http.ResponseWriter, r *http.Request) {
 	e = json.NewEncoder(w).Encode(newUserResponse(u))
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("failed to encode user %v", e)
+		logging.FromContext(ctx).Errorf("failed to encode user %v", e)
 		http.Error(w, http.StatusText(c), c)
 	}
 }
 
 func (h *HTTPServer) fetchUser(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	sID := chi.URLParam(r, "user_id")
 	UID, e := uuid.Parse(sID)
 	if e != nil {
-		h.log.Errorf("unable to parse request fetch user parameters %v", e)
+		logging.FromContext(ctx).Errorf("unable to parse request fetch user parameters %v", e)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	u, e := h.bundle.UserService.Read(r.Context(), UID)
+	u, e := h.bundle.UserService.Read(ctx, UID)
 	if e != nil {
 
-		h.log.Errorf("failed to read user %v", e)
+		logging.FromContext(ctx).Errorf("failed to read user %v", e)
 
 		if e == domain.ErrResourceNotFound {
 			c := http.StatusNotFound
@@ -194,7 +197,7 @@ func (h *HTTPServer) fetchUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(newUserResponse(u))
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -245,17 +248,19 @@ type AddContactResponse struct {
 
 func (h *HTTPServer) addContact(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &AddContactParams{}
 	e := render.Bind(r, p)
 	if e != nil {
-		h.log.Errorf("failed to decode request body %v", e)
+		logging.FromContext(ctx).Errorf("failed to decode request body %v", e)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	c, e := h.bundle.ContactService.Create(r.Context(), p.NewContact)
+	c, e := h.bundle.ContactService.Create(ctx, p.NewContact)
 	if e != nil {
-		h.log.Errorf("failed to add new contact %v", e)
+		logging.FromContext(ctx).Errorf("failed to add new contact %v", e)
 		http.Error(w, "failed to add new contact", http.StatusInternalServerError)
 		return
 	}
@@ -263,7 +268,7 @@ func (h *HTTPServer) addContact(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	e = json.NewEncoder(w).Encode(newContactResponse(c))
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -301,11 +306,13 @@ func (uup *UpdateUserParams) Bind(_ *http.Request) error {
 
 func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &UpdateUserParams{}
 	e := render.Bind(r, p)
 	if e != nil {
 		c := http.StatusBadRequest
-		h.log.Errorf("failed to bind request update user to body %v", e)
+		logging.FromContext(ctx).Errorf("failed to bind request update user to body %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -323,10 +330,10 @@ func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 		Email:    p.Email,
 	}
 
-	u, e := h.bundle.UserService.Update(r.Context(), uu)
+	u, e := h.bundle.UserService.Update(ctx, uu)
 	if e != nil {
 
-		h.log.Errorf("failed to update user %v", e)
+		logging.FromContext(ctx).Errorf("failed to update user %v", e)
 
 		if e == domain.ErrUniqueExists {
 			c := http.StatusConflict
@@ -346,7 +353,7 @@ func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(u)
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -390,17 +397,19 @@ func newSearchUsersResponse(details []*domain.UserDetails) *SearchUsersResponse 
 
 func (h *HTTPServer) searchUsers(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &SearchUsersParams{}
 	e := render.Bind(r, p)
 	if e != nil {
-		h.log.Errorf("invaid parameters for search users request %v", e)
+		logging.FromContext(ctx).Errorf("invaid parameters for search users request %v", e)
 		http.Error(w, "invalid parameters", http.StatusBadRequest)
 		return
 	}
 
-	uds, e := h.bundle.UserService.Search(r.Context(), p.Search)
+	uds, e := h.bundle.UserService.Search(ctx, p.Search)
 	if e != nil {
-		h.log.Errorf("failed to search users %v", e)
+		logging.FromContext(ctx).Errorf("failed to search users %v", e)
 
 		if e == domain.ErrEmptyResult {
 
@@ -410,7 +419,7 @@ func (h *HTTPServer) searchUsers(w http.ResponseWriter, r *http.Request) {
 			e = json.NewEncoder(w).Encode(newSearchUsersResponse([]*domain.UserDetails{}))
 			if e != nil {
 				c = http.StatusInternalServerError
-				h.log.Errorf("unable to encode response %v", e)
+				logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 				http.Error(w, http.StatusText(c), c)
 				return
 			}
@@ -424,7 +433,7 @@ func (h *HTTPServer) searchUsers(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(newSearchUsersResponse(uds))
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 	}
 }
@@ -471,6 +480,8 @@ func newSearchContactsResponse(contacts []*domain.Contact) *SearchContactsRespon
 
 func (h *HTTPServer) searchContacts(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &SearchContactsParams{}
 	e := render.Bind(r, p)
 	if e != nil {
@@ -479,10 +490,10 @@ func (h *HTTPServer) searchContacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cs, e := h.bundle.ContactService.Search(r.Context(), p.Search)
+	cs, e := h.bundle.ContactService.Search(ctx, p.Search)
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("failed to seach contacts %v", e)
+		logging.FromContext(ctx).Errorf("failed to seach contacts %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -491,7 +502,7 @@ func (h *HTTPServer) searchContacts(w http.ResponseWriter, r *http.Request) {
 	e = json.NewEncoder(w).Encode(newSearchContactsResponse(cs))
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, http.StatusText(c), c)
 	}
 }
@@ -526,11 +537,13 @@ type FetchContactResponse struct {
 
 func (h *HTTPServer) fetchContact(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &FetchContactParams{}
 	e := render.Bind(r, p)
 	if e != nil {
 		c := http.StatusBadRequest
-		h.log.Errorf("failed to bind request to fetch contact model %v", e)
+		logging.FromContext(ctx).Errorf("failed to bind request to fetch contact model %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -538,7 +551,7 @@ func (h *HTTPServer) fetchContact(w http.ResponseWriter, r *http.Request) {
 	c, e := h.bundle.ContactService.Read(r.Context(), p.UID)
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("unable to read contact %v", e)
+		logging.FromContext(ctx).Errorf("unable to read contact %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -547,24 +560,26 @@ func (h *HTTPServer) fetchContact(w http.ResponseWriter, r *http.Request) {
 	e = json.NewEncoder(w).Encode(c)
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, http.StatusText(c), c)
 	}
 }
 
 func (h *HTTPServer) listContacts(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	sid := r.Context().Value("user").(string)
 	uid, e := uuid.Parse(sid)
 	if e != nil {
-		h.log.Errorf("unable to parse request user uuid %v", e)
+		logging.FromContext(ctx).Errorf("unable to parse request user uuid %v", e)
 		http.Error(w, "invalid request header", http.StatusBadRequest)
 		return
 	}
 
 	cs, e := h.bundle.ContactService.List(r.Context(), uid)
 	if e != nil {
-		h.log.Errorf("failed to list contacts %v", e)
+		logging.FromContext(ctx).Errorf("failed to list contacts %v", e)
 		http.Error(w, "failed to list contacts", http.StatusInternalServerError)
 		return
 	}
@@ -572,7 +587,7 @@ func (h *HTTPServer) listContacts(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(cs)
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 	}
 }
@@ -612,6 +627,8 @@ type DeleteContactResponse struct {
 
 func (h *HTTPServer) deleteContact(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &DeleteContactParams{}
 	e := render.Bind(r, p)
 	if e != nil {
@@ -620,7 +637,7 @@ func (h *HTTPServer) deleteContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	e = h.bundle.ContactService.Delete(r.Context(), p.UID)
+	e = h.bundle.ContactService.Delete(ctx, p.UID)
 	if e != nil {
 
 		if e == domain.ErrResourceNotFound {
@@ -630,7 +647,7 @@ func (h *HTTPServer) deleteContact(w http.ResponseWriter, r *http.Request) {
 		}
 
 		c := http.StatusInternalServerError
-		h.log.Errorf("unable to delete contact %v", e)
+		logging.FromContext(ctx).Errorf("unable to delete contact %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
@@ -643,7 +660,7 @@ func (h *HTTPServer) deleteContact(w http.ResponseWriter, r *http.Request) {
 	e = json.NewEncoder(w).Encode(rp)
 	if e != nil {
 		c := http.StatusInternalServerError
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, http.StatusText(c), c)
 	}
 }
@@ -680,24 +697,26 @@ func createConversationResponse(conversation *domain.Conversation) *CreateConver
 
 func (h *HTTPServer) createConversation(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &CreateConversationParams{}
 	e := render.Bind(r, p)
 	if e != nil {
-		h.log.Errorf("invalid request body %v", e)
+		logging.FromContext(ctx).Errorf("invalid request body %v", e)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	c, e := h.bundle.MessengerService.CreateConversation(r.Context(), p.NewConversation)
+	c, e := h.bundle.MessengerService.CreateConversation(ctx, p.NewConversation)
 	if e != nil {
-		h.log.Errorf("unable to create new conversation %v", e)
+		logging.FromContext(ctx).Errorf("unable to create new conversation %v", e)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	if e := json.NewEncoder(w).Encode(createConversationResponse(c)); e != nil {
-		h.log.Errorf("failed to encode response %v", e)
+		logging.FromContext(ctx).Errorf("failed to encode response %v", e)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
@@ -759,18 +778,20 @@ func newListConversationsResponse(conversations []*domain.Conversation) *ListCon
 
 func (h *HTTPServer) listConversations(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	p := &ListConversationsParams{}
 	e := render.Bind(r, p)
 	if e != nil {
 		c := http.StatusBadRequest
-		h.log.Errorf("unable to parse request parameters %v", e)
+		logging.FromContext(ctx).Errorf("unable to parse request parameters %v", e)
 		http.Error(w, http.StatusText(c), c)
 		return
 	}
 
-	cs, e := h.bundle.MessengerService.ListConversations(r.Context(), p.UID)
+	cs, e := h.bundle.MessengerService.ListConversations(ctx, p.UID)
 	if e != nil {
-		h.log.Errorf("failed to list conversations %v", e)
+		logging.FromContext(ctx).Errorf("failed to list conversations %v", e)
 		http.Error(w, "failed to list conversations", http.StatusInternalServerError)
 		return
 	}
@@ -778,17 +799,19 @@ func (h *HTTPServer) listConversations(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(newListConversationsResponse(cs))
 	if e != nil {
-		h.log.Errorf("unable to encode response %v", e)
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 	}
 }
 
-func (h *HTTPServer) health(w http.ResponseWriter, _ *http.Request) {
+func (h *HTTPServer) health(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
 
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte("OK"))
 	if err != nil {
-		h.log.Errorf("error encoding health check response %v", err)
+		logging.FromContext(ctx).Errorf("error encoding health check response %v", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }

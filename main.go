@@ -26,8 +26,7 @@ import (
 
 func main() {
 
-	fxApp := fx.New(
-		fx.Provide(logging.New),
+	fa := fx.New(
 		fx.Provide(db.NewSQLite),
 		fx.Provide(domain.NewBundle),
 		fx.Provide(port.NewHTTPServer),
@@ -36,19 +35,22 @@ func main() {
 		fx.Invoke(registerHooks),
 	)
 
-	start, cancel := context.WithTimeout(context.TODO(), time.Second*15)
-	defer cancel()
+	st, ca := context.WithTimeout(context.TODO(), time.Second*15)
+	defer ca()
 
-	if err := fxApp.Start(start); err != nil {
+	l := logging.NewLoggerFromEnv()
+	st = logging.WithLogger(st, l)
+
+	if err := fa.Start(st); err != nil {
 		log.Fatalf("error starting service %v", err)
 	}
 
-	<-fxApp.Done()
+	<-fa.Done()
 
-	stop, cancel := context.WithTimeout(context.TODO(), time.Second*15)
-	defer cancel()
+	st, ca = context.WithTimeout(context.TODO(), time.Second*15)
+	defer ca()
 
-	if err := fxApp.Stop(stop); err != nil {
+	if err := fa.Stop(st); err != nil {
 		log.Fatalf("error stopping service %v", err)
 	}
 }
