@@ -2,7 +2,7 @@ FROM golang:1.20-bullseye as builder
 
 WORKDIR /app/src
 
-COPY go.mod go.sum .
+COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
@@ -14,6 +14,6 @@ COPY --from=builder /app/bin/ /app/bin/
 
 COPY migrations /app/migrations
 
-VOLUME [ "/app/sqlite", "/app/migrations" ]
+VOLUME [ "/app/sqlite" ]
 
 ENTRYPOINT ["/app/bin/server"]

@@ -47,12 +47,6 @@ job "chat" {
             }
         }
 
-        volume "migrations" {
-            type = "host"
-            source = "chat-migrations"
-            read_only = true
-        }
-
         volume "db" {
             type = "host"
             source = "chat-db"
@@ -69,11 +63,6 @@ job "chat" {
             }
 
             volume_mount {
-                volume = "migrations"
-                destination = "/app/migrations"
-            }
-
-            volume_mount {
                 volume = "db"
                 destination = "/app/sqlite"
             }
@@ -82,7 +71,7 @@ job "chat" {
                 HTTP_SERVER_PORT = "${NOMAD_PORT_http}"
 		        GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
                 SQLITE_DSN = "/app/sqlite/chat.db"
-                SQLITE_MIGRATIONS_DIR = "/app/migrations"
+                SQLITE_MIGRATIONS_DIR = "/app/src/migrations"
                 LOG_LEVEL = "production"
             }
 
