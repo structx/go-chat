@@ -7,26 +7,40 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 )
 
 const insertConversation = `-- name: InsertConversation :one
-INSERT INTO conversations (uuid, recipients)
+INSERT INTO conversations (uuid)
 VALUES (
-    ?, ?
-) RETURNING uuid, recipients, created_at
+    ?
+) RETURNING uuid, created_at, updated_at
 `
 
-type InsertConversationParams struct {
-	Uuid       string
-	Recipients string
+// add conversation to database
+func (q *Queries) InsertConversation(ctx context.Context, uuid string) (*Conversation, error) {
+	row := q.queryRow(ctx, q.insertConversationStmt, insertConversation, uuid)
+	var i Conversation
+	err := row.Scan(&i.Uuid, &i.CreatedAt, &i.UpdatedAt)
+	return &i, err
 }
 
-// add conversation to database
-func (q *Queries) InsertConversation(ctx context.Context, arg *InsertConversationParams) (*Conversation, error) {
-	row := q.queryRow(ctx, q.insertConversationStmt, insertConversation, arg.Uuid, arg.Recipients)
-	var i Conversation
-	err := row.Scan(&i.Uuid, &i.Recipients, &i.CreatedAt)
-	return &i, err
+const insertMMConversationUser = `-- name: InsertMMConversationUser :execresult
+INSERT INTO mm_conversations_users (
+    uuid, conversation_uuid, user_uuid
+) VALUES (
+    ?, ?, ?
+)
+`
+
+type InsertMMConversationUserParams struct {
+	Uuid             string
+	ConversationUuid string
+	UserUuid         string
+}
+
+func (q *Queries) InsertMMConversationUser(ctx context.Context, arg *InsertMMConversationUserParams) (sql.Result, error) {
+	return q.exec(ctx, q.insertMMConversationUserStmt, insertMMConversationUser, arg.Uuid, arg.ConversationUuid, arg.UserUuid)
 }
 
 const insertMessage = `-- name: InsertMessage :one
@@ -63,22 +77,30 @@ func (q *Queries) InsertMessage(ctx context.Context, arg *InsertMessageParams) (
 }
 
 const readAllConversations = `-- name: ReadAllConversations :many
-SELECT uuid, recipients, created_at
-FROM conversations, json_each(conversations.recipients) as rt
-WHERE recipients = ?
+SELECT conversations.uuid, mm_conversations_users.user_uuid, conversations.updated_at
+FROM conversations
+JOIN mm_conversations_users
+    ON conversation.uuid = mm_conversations_users.conversation_uuid
+WHERE mm_conversations_users.user_uuid = ?
 `
 
+type ReadAllConversationsRow struct {
+	Uuid      string
+	UserUuid  string
+	UpdatedAt sql.NullTime
+}
+
 // retrieve all conversations that includes user uuid in recipients field
-func (q *Queries) ReadAllConversations(ctx context.Context, recipients string) ([]*Conversation, error) {
-	rows, err := q.query(ctx, q.readAllConversationsStmt, readAllConversations, recipients)
+func (q *Queries) ReadAllConversations(ctx context.Context, userUuid string) ([]*ReadAllConversationsRow, error) {
+	rows, err := q.query(ctx, q.readAllConversationsStmt, readAllConversations, userUuid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []*Conversation{}
+	items := []*ReadAllConversationsRow{}
 	for rows.Next() {
-		var i Conversation
-		if err := rows.Scan(&i.Uuid, &i.Recipients, &i.CreatedAt); err != nil {
+		var i ReadAllConversationsRow
+		if err := rows.Scan(&i.Uuid, &i.UserUuid, &i.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)

@@ -2,42 +2,75 @@
 package port
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 
 	"github.com/trevatk/go-chat/internal/domain"
+	mw "github.com/trevatk/go-chat/internal/port/middleware"
 	"github.com/trevatk/go-pkg/logging"
 )
 
 // HTTPServer exposed endpoints
 type HTTPServer struct {
-	bundle *domain.Bundle
+	bundle     *domain.Bundle
+	privateKey *ecdsa.PrivateKey
 }
 
 // NewHTTPServer create new http server instance
-func NewHTTPServer(bundle *domain.Bundle) *HTTPServer {
-	return &HTTPServer{bundle: bundle}
+func NewHTTPServer(bundle *domain.Bundle) (*HTTPServer, error) {
+
+	p := os.Getenv("JWT_PRIVATE_KEY")
+	if p == "" {
+		return nil, errors.New("$JWT_PRIVATE_KEY is not set")
+	}
+
+	bb, e := os.ReadFile(filepath.Clean(p))
+	if e != nil {
+		return nil, fmt.Errorf("failed to open ecdsa private key %v", e)
+	}
+
+	b, _ := pem.Decode(bb)
+
+	pk, e := x509.ParseECPrivateKey(b.Bytes)
+	if e != nil {
+		return nil, fmt.Errorf("failed to to parse key from bytes %v", e)
+	}
+
+	return &HTTPServer{bundle: bundle, privateKey: pk}, nil
 }
 
 // NewRouter create new chi implementation of http.ServeMux
-func NewRouter(srv *HTTPServer) *chi.Mux {
+func NewRouter(srv *HTTPServer, auth *mw.Authenticator) *chi.Mux {
+
+	ao := os.Getenv("ALLOWED_ORIGINS")
+	if ao == "" {
+		ao = "http://localhost"
+	}
 
 	r := chi.NewRouter()
 
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{ao},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -47,7 +80,8 @@ func NewRouter(srv *HTTPServer) *chi.Mux {
 
 	r.Route("/api/v1", func(r chi.Router) {
 
-		r.Post("/user", srv.createUser)
+		r.Use(auth.ValidateJWT)
+
 		r.Get("/user/{user_id}", srv.fetchUser)
 		r.Put("/user", srv.updateUser)
 		r.Get("/user/search/{search_str}", srv.searchUsers)
@@ -62,6 +96,8 @@ func NewRouter(srv *HTTPServer) *chi.Mux {
 		r.Get("/conversation/", srv.listConversations)
 	})
 
+	r.Post("/api/v1/user", srv.createUser)
+	r.Post("/api/v1/user/login", srv.userLogin)
 	r.Get("/health", srv.health)
 
 	return r
@@ -71,6 +107,7 @@ func NewRouter(srv *HTTPServer) *chi.Mux {
 type NewUserPayload struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // NewUserParams new user request parameters
@@ -89,6 +126,8 @@ func (nup *NewUserParams) Bind(_ *http.Request) error {
 		return errors.New("no name parameter provided")
 	} else if nup.Email == "" {
 		return errors.New("no email parameter provided")
+	} else if nup.Password == "" {
+		return errors.New("no password parameter provided")
 	}
 
 	return nil
@@ -142,6 +181,7 @@ func (h *HTTPServer) createUser(w http.ResponseWriter, r *http.Request) {
 	nu := &domain.NewUser{
 		Username: p.Username,
 		Email:    p.Email,
+		Password: p.Password,
 	}
 
 	u, e := h.bundle.UserService.Create(ctx, nu)
@@ -197,6 +237,79 @@ func (h *HTTPServer) fetchUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	e = json.NewEncoder(w).Encode(newUserResponse(u))
 	if e != nil {
+		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
+		http.Error(w, "unable to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// UserLoginRequest http user login request model
+type UserLoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// Bind parse user login request from http
+func (ulp *UserLoginRequest) Bind(_ *http.Request) error {
+
+	if len(ulp.Username) < 1 {
+		return errors.New("invalid username provided")
+	} else if len(ulp.Password) < 1 {
+		return errors.New("invalid password provided")
+	}
+
+	return nil
+}
+
+// UserLoginResponse http user login response model
+type UserLoginResponse struct {
+	UserID string `json:"user_id"`
+	Token  string `json:"access_token"`
+}
+
+func (h *HTTPServer) userLogin(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	p := &UserLoginRequest{}
+	e := render.Bind(r, p)
+	if e != nil {
+		http.Error(w, "invalid request object", http.StatusBadRequest)
+		return
+	}
+
+	uid, e := h.bundle.UserService.Login(ctx, p.Username, p.Password)
+	if e != nil {
+		logging.FromContext(ctx).Errorf("failed to check user login %v", e)
+		http.Error(w, "unable to verify user login", http.StatusInternalServerError)
+		return
+	}
+
+	c := &mw.CustomClaims{
+		Claims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+		UserID: uid,
+	}
+
+	t := jwt.NewWithClaims(jwt.SigningMethodES384, c)
+
+	s, e := t.SignedString(h.privateKey)
+	if e != nil {
+		logging.FromContext(ctx).Errorf("failed to sign jwt token %v", e)
+		http.Error(w, "failed to generate jwt token", http.StatusInternalServerError)
+		return
+	}
+
+	rsp := &UserLoginResponse{
+		UserID: uid,
+		Token:  s,
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	if e := json.NewEncoder(w).Encode(rsp); e != nil {
 		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
 		return
@@ -758,16 +871,9 @@ func newListConversationsResponse(conversations []*domain.Conversation) *ListCon
 
 	for _, c := range conversations {
 
-		r := make([]string, 0, len(c.Recipients))
-
-		for _, re := range c.Recipients {
-			r = append(r, re.String())
-		}
-
 		cs = append(cs, &ConversationPayload{
-			UID:        c.UID.String(),
-			Recipients: r,
-			CreatedAt:  c.CreatedAt,
+			UID:       c.UID.String(),
+			CreatedAt: c.CreatedAt,
 		})
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,9 +17,9 @@ type NewConversation struct {
 
 // Conversation application layer conversation model
 type Conversation struct {
-	UID        uuid.UUID
-	Recipients []uuid.UUID
-	CreatedAt  time.Time
+	UID       uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // NewEnvelope application layer new envelope model
@@ -59,30 +58,44 @@ func (ms *MessengerService) CreateConversation(ctx context.Context, newConversat
 	}
 	defer func() { _ = co.Close() }()
 
+	tx, e := co.BeginTx(ctx, nil)
+	if e != nil {
+		return nil, fmt.Errorf("unable to begin transaction %v", e)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	if len(newConversation.Recipients) < 2 {
 		return nil, ErrMinRecipients
 	}
 
-	var r = fmt.Sprintf("%s,%s", newConversation.Recipients[0].String(), newConversation.Recipients[1].String())
+	q := repository.New(co).WithTx(tx)
 
-	if len(newConversation.Recipients) > 2 {
+	c, e := q.InsertConversation(ctx, uid.String())
+	if e != nil {
+		return nil, fmt.Errorf("unable to add conversation to database %v", e)
+	}
 
-		for i, recipient := range newConversation.Recipients {
+	for _, r := range newConversation.Recipients {
 
-			if i == 0 || i == 1 {
-				continue
-			}
+		cuID := uuid.New()
 
-			r = fmt.Sprintf("%s,%s", r, recipient.String())
+		r, e := q.InsertMMConversationUser(ctx, &repository.InsertMMConversationUserParams{
+			Uuid:             cuID.String(),
+			ConversationUuid: uid.String(),
+			UserUuid:         r.String(),
+		})
+		if e != nil {
+			return nil, fmt.Errorf("unable to add users to conversation %v", e)
+		}
+
+		if af, e := r.RowsAffected(); e != nil || af < 1 {
+			return nil, fmt.Errorf("no rows affected %v", e)
 		}
 	}
 
-	c, e := repository.New(co).InsertConversation(ctx, &repository.InsertConversationParams{
-		Uuid:       uid.String(),
-		Recipients: r,
-	})
+	e = tx.Commit()
 	if e != nil {
-		return nil, fmt.Errorf("unable to add conversation to database %v", e)
+		return nil, fmt.Errorf("failed to commit transaction %v", e)
 	}
 
 	return transformSQLConversation(c), nil
@@ -112,7 +125,7 @@ func (ms *MessengerService) ListConversations(ctx context.Context, uid uuid.UUID
 	cl := make([]*Conversation, 0, len(scl))
 
 	for _, sc := range scl {
-		cl = append(cl, transformSQLConversation(sc))
+		cl = append(cl, transformReadAllConversationsRow(sc))
 	}
 
 	return cl, nil
@@ -165,20 +178,33 @@ func (ms *MessengerService) ListMessages(ctx context.Context, conversationUUID u
 	return el, nil
 }
 
-func transformSQLConversation(conversation *repository.Conversation) *Conversation {
+func transformSQLConversation(conv *repository.Conversation) *Conversation {
 
-	rs := strings.Split(conversation.Recipients, ",")
+	u := time.Time{}
 
-	ruids := make([]uuid.UUID, 0, len(rs))
-
-	for _, r := range rs {
-		ruids = append(ruids, uuid.MustParse(strings.TrimSpace(r)))
+	if conv.UpdatedAt.Valid {
+		u = conv.UpdatedAt.Time
 	}
 
 	return &Conversation{
-		UID:        uuid.MustParse(conversation.Uuid),
-		Recipients: ruids,
-		CreatedAt:  conversation.CreatedAt,
+		UID:       uuid.MustParse(conv.Uuid),
+		CreatedAt: conv.CreatedAt,
+		UpdatedAt: u,
+	}
+}
+
+func transformReadAllConversationsRow(row *repository.ReadAllConversationsRow) *Conversation {
+
+	cID := uuid.MustParse(row.Uuid)
+
+	u := time.Time{}
+	if row.UpdatedAt.Valid {
+		u = row.UpdatedAt.Time
+	}
+
+	return &Conversation{
+		UID:       cID,
+		UpdatedAt: u,
 	}
 }
 

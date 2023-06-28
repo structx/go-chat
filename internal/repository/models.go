@@ -17,9 +17,9 @@ type Contact struct {
 }
 
 type Conversation struct {
-	Uuid       string
-	Recipients string
-	CreatedAt  time.Time
+	Uuid      string
+	CreatedAt time.Time
+	UpdatedAt sql.NullTime
 }
 
 type Message struct {
@@ -42,4 +42,5 @@ type User struct {
 	Email     string
 	CreatedAt time.Time
 	UpdatedAt sql.NullTime
+	Pssword   string
 }

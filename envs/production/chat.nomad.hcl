@@ -73,6 +73,8 @@ job "chat" {
                 SQLITE_DSN = "/app/sqlite/chat.db"
                 SQLITE_MIGRATIONS_DIR = "/app/src/migrations"
                 LOG_LEVEL = "production"
+                ALLOWED_ORIGINS = "https://messenger.structx.io"
+                JWT_PRIVATE_KEY = ""
             }
 
             resources {

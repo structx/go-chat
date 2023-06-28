@@ -10,21 +10,27 @@ import (
 )
 
 const insertUser = `-- name: InsertUser :one
-INSERT INTO users (uuid, usernm, email)
+INSERT INTO users (uuid, usernm, email, pssword)
 VALUES (
-    ?, ?, ?
-) RETURNING uuid, usernm, email, created_at, updated_at
+    ?, ?, ?, ?
+) RETURNING uuid, usernm, email, created_at, updated_at, pssword
 `
 
 type InsertUserParams struct {
-	Uuid   string
-	Usernm string
-	Email  string
+	Uuid    string
+	Usernm  string
+	Email   string
+	Pssword string
 }
 
 // add user to database
 func (q *Queries) InsertUser(ctx context.Context, arg *InsertUserParams) (*User, error) {
-	row := q.queryRow(ctx, q.insertUserStmt, insertUser, arg.Uuid, arg.Usernm, arg.Email)
+	row := q.queryRow(ctx, q.insertUserStmt, insertUser,
+		arg.Uuid,
+		arg.Usernm,
+		arg.Email,
+		arg.Pssword,
+	)
 	var i User
 	err := row.Scan(
 		&i.Uuid,
@@ -32,12 +38,13 @@ func (q *Queries) InsertUser(ctx context.Context, arg *InsertUserParams) (*User,
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Pssword,
 	)
 	return &i, err
 }
 
 const readUser = `-- name: ReadUser :one
-SELECT uuid, usernm, email, created_at, updated_at
+SELECT uuid, usernm, email, created_at, updated_at, pssword
 FROM users
 WHERE uuid = ?
 `
@@ -52,6 +59,7 @@ func (q *Queries) ReadUser(ctx context.Context, uuid string) (*User, error) {
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Pssword,
 	)
 	return &i, err
 }
@@ -72,6 +80,31 @@ func (q *Queries) ReadUserDetails(ctx context.Context, uuid string) (*ReadUserDe
 	row := q.queryRow(ctx, q.readUserDetailsStmt, readUserDetails, uuid)
 	var i ReadUserDetailsRow
 	err := row.Scan(&i.Usernm, &i.Email)
+	return &i, err
+}
+
+const readUserLoginDetails = `-- name: ReadUserLoginDetails :one
+SELECT uuid, pssword
+FROM users
+WHERE email = ? 
+    OR usernm = ?
+LIMIT 1
+`
+
+type ReadUserLoginDetailsParams struct {
+	Email  string
+	Usernm string
+}
+
+type ReadUserLoginDetailsRow struct {
+	Uuid    string
+	Pssword string
+}
+
+func (q *Queries) ReadUserLoginDetails(ctx context.Context, arg *ReadUserLoginDetailsParams) (*ReadUserLoginDetailsRow, error) {
+	row := q.queryRow(ctx, q.readUserLoginDetailsStmt, readUserLoginDetails, arg.Email, arg.Usernm)
+	var i ReadUserLoginDetailsRow
+	err := row.Scan(&i.Uuid, &i.Pssword)
 	return &i, err
 }
 
@@ -124,7 +157,7 @@ SET
     email = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE uuid = ?
-RETURNING uuid, usernm, email, created_at, updated_at
+RETURNING uuid, usernm, email, created_at, updated_at, pssword
 `
 
 type UpdateUserParams struct {
@@ -142,6 +175,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User,
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Pssword,
 	)
 	return &i, err
 }

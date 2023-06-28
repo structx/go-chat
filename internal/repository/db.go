@@ -33,6 +33,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertConversationStmt, err = db.PrepareContext(ctx, insertConversation); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertConversation: %w", err)
 	}
+	if q.insertMMConversationUserStmt, err = db.PrepareContext(ctx, insertMMConversationUser); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertMMConversationUser: %w", err)
+	}
 	if q.insertMessageStmt, err = db.PrepareContext(ctx, insertMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertMessage: %w", err)
 	}
@@ -56,6 +59,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.readUserDetailsStmt, err = db.PrepareContext(ctx, readUserDetails); err != nil {
 		return nil, fmt.Errorf("error preparing query ReadUserDetails: %w", err)
+	}
+	if q.readUserLoginDetailsStmt, err = db.PrepareContext(ctx, readUserLoginDetails); err != nil {
+		return nil, fmt.Errorf("error preparing query ReadUserLoginDetails: %w", err)
 	}
 	if q.searchContactsStmt, err = db.PrepareContext(ctx, searchContacts); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchContacts: %w", err)
@@ -84,6 +90,11 @@ func (q *Queries) Close() error {
 	if q.insertConversationStmt != nil {
 		if cerr := q.insertConversationStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertConversationStmt: %w", cerr)
+		}
+	}
+	if q.insertMMConversationUserStmt != nil {
+		if cerr := q.insertMMConversationUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertMMConversationUserStmt: %w", cerr)
 		}
 	}
 	if q.insertMessageStmt != nil {
@@ -124,6 +135,11 @@ func (q *Queries) Close() error {
 	if q.readUserDetailsStmt != nil {
 		if cerr := q.readUserDetailsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing readUserDetailsStmt: %w", cerr)
+		}
+	}
+	if q.readUserLoginDetailsStmt != nil {
+		if cerr := q.readUserLoginDetailsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing readUserLoginDetailsStmt: %w", cerr)
 		}
 	}
 	if q.searchContactsStmt != nil {
@@ -178,41 +194,45 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                       DBTX
-	tx                       *sql.Tx
-	deleteContactStmt        *sql.Stmt
-	insertContactStmt        *sql.Stmt
-	insertConversationStmt   *sql.Stmt
-	insertMessageStmt        *sql.Stmt
-	insertUserStmt           *sql.Stmt
-	readAllContactsStmt      *sql.Stmt
-	readAllConversationsStmt *sql.Stmt
-	readAllMessagesStmt      *sql.Stmt
-	readContactStmt          *sql.Stmt
-	readUserStmt             *sql.Stmt
-	readUserDetailsStmt      *sql.Stmt
-	searchContactsStmt       *sql.Stmt
-	searchUserDetailsStmt    *sql.Stmt
-	updateUserStmt           *sql.Stmt
+	db                           DBTX
+	tx                           *sql.Tx
+	deleteContactStmt            *sql.Stmt
+	insertContactStmt            *sql.Stmt
+	insertConversationStmt       *sql.Stmt
+	insertMMConversationUserStmt *sql.Stmt
+	insertMessageStmt            *sql.Stmt
+	insertUserStmt               *sql.Stmt
+	readAllContactsStmt          *sql.Stmt
+	readAllConversationsStmt     *sql.Stmt
+	readAllMessagesStmt          *sql.Stmt
+	readContactStmt              *sql.Stmt
+	readUserStmt                 *sql.Stmt
+	readUserDetailsStmt          *sql.Stmt
+	readUserLoginDetailsStmt     *sql.Stmt
+	searchContactsStmt           *sql.Stmt
+	searchUserDetailsStmt        *sql.Stmt
+	updateUserStmt               *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                       tx,
-		tx:                       tx,
-		deleteContactStmt:        q.deleteContactStmt,
-		insertContactStmt:        q.insertContactStmt,
-		insertConversationStmt:   q.insertConversationStmt,
-		insertMessageStmt:        q.insertMessageStmt,
-		insertUserStmt:           q.insertUserStmt,
-		readAllContactsStmt:      q.readAllContactsStmt,
-		readAllConversationsStmt: q.readAllConversationsStmt,
-		readAllMessagesStmt:      q.readAllMessagesStmt,
-		readContactStmt:          q.readContactStmt,
-		readUserStmt:             q.readUserStmt,
-		readUserDetailsStmt:      q.readUserDetailsStmt,
-		searchContactsStmt:       q.searchContactsStmt,
-		searchUserDetailsStmt:    q.searchUserDetailsStmt,
-		updateUserStmt:           q.updateUserStmt,
+		db:                           tx,
+		tx:                           tx,
+		deleteContactStmt:            q.deleteContactStmt,
+		insertContactStmt:            q.insertContactStmt,
+		insertConversationStmt:       q.insertConversationStmt,
+		insertMMConversationUserStmt: q.insertMMConversationUserStmt,
+		insertMessageStmt:            q.insertMessageStmt,
+		insertUserStmt:               q.insertUserStmt,
+		readAllContactsStmt:          q.readAllContactsStmt,
+		readAllConversationsStmt:     q.readAllConversationsStmt,
+		readAllMessagesStmt:          q.readAllMessagesStmt,
+		readContactStmt:              q.readContactStmt,
+		readUserStmt:                 q.readUserStmt,
+		readUserDetailsStmt:          q.readUserDetailsStmt,
+		readUserLoginDetailsStmt:     q.readUserLoginDetailsStmt,
+		searchContactsStmt:           q.searchContactsStmt,
+		searchUserDetailsStmt:        q.searchUserDetailsStmt,
+		updateUserStmt:               q.updateUserStmt,
 	}
 }

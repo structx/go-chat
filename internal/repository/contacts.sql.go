@@ -101,7 +101,7 @@ func (q *Queries) ReadContact(ctx context.Context, uuid string) (*Contact, error
 }
 
 const searchContacts = `-- name: SearchContacts :many
-SELECT contacts.uuid, origin_uuid, recipient_uuid, contacts.created_at, users.uuid, usernm, email, users.created_at, updated_at
+SELECT contacts.uuid, origin_uuid, recipient_uuid, contacts.created_at, users.uuid, usernm, email, users.created_at, updated_at, pssword
 FROM contacts 
 JOIN users
     ON contacts.recipient_uuid = users.uuid
@@ -125,6 +125,7 @@ type SearchContactsRow struct {
 	Email         string
 	CreatedAt_2   time.Time
 	UpdatedAt     sql.NullTime
+	Pssword       string
 }
 
 // retrieve all contacts by name and email
@@ -147,6 +148,7 @@ func (q *Queries) SearchContacts(ctx context.Context, arg *SearchContactsParams)
 			&i.Email,
 			&i.CreatedAt_2,
 			&i.UpdatedAt,
+			&i.Pssword,
 		); err != nil {
 			return nil, err
 		}

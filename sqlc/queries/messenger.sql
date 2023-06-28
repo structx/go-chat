@@ -6,9 +6,16 @@ VALUES (
     ?
 ) RETURNING *;
 
+-- name: InsertMMConversationUser :execresult
+INSERT INTO mm_conversations_users (
+    uuid, conversation_uuid, user_uuid
+) VALUES (
+    ?, ?, ?
+);
+
 -- name: ReadAllConversations :many
 -- retrieve all conversations that includes user uuid in recipients field
-SELECT *
+SELECT conversations.uuid, mm_conversations_users.user_uuid, conversations.updated_at
 FROM conversations
 JOIN mm_conversations_users
     ON conversation.uuid = mm_conversations_users.conversation_uuid

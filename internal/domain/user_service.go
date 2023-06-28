@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/trevatk/go-chat/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 	"modernc.org/sqlite"
 	codes "modernc.org/sqlite/lib"
 )
@@ -17,6 +18,7 @@ import (
 type NewUser struct {
 	Username string
 	Email    string
+	Password string
 }
 
 // User application layer user model
@@ -24,6 +26,7 @@ type User struct {
 	UID       uuid.UUID
 	Username  string
 	Email     string
+	Password  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -65,10 +68,19 @@ func (us *UserService) Create(ctx context.Context, newUser *NewUser) (*User, err
 	}
 	defer func() { _ = co.Close() }()
 
-	su, e := repository.New(co).InsertUser(ctx, &repository.InsertUserParams{
-		Uuid:   uid.String(),
-		Usernm: newUser.Username,
-		Email:  newUser.Email,
+	p, e := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost+bcrypt.MinCost)
+	if e != nil {
+		return nil, fmt.Errorf("failed to generated hashed password %v", e)
+	}
+
+	to, ca := context.WithTimeout(ctx, time.Second*3)
+	defer ca()
+
+	su, e := repository.New(co).InsertUser(to, &repository.InsertUserParams{
+		Uuid:    uid.String(),
+		Usernm:  newUser.Username,
+		Email:   newUser.Email,
+		Pssword: string(p),
 	})
 	if e != nil {
 
@@ -96,6 +108,36 @@ func (us *UserService) Create(ctx context.Context, newUser *NewUser) (*User, err
 	}
 
 	return transformSQLUser(su), nil
+}
+
+// Login authenticate user
+func (us *UserService) Login(ctx context.Context, username, password string) (string, error) {
+
+	co, e := us.db.Conn(ctx)
+	if e != nil {
+		return "", fmt.Errorf("failed to pull connection pool %v", e)
+	}
+	defer func() { _ = co.Close() }()
+
+	p := &repository.ReadUserLoginDetailsParams{
+		Email:  username,
+		Usernm: username,
+	}
+
+	to, ca := context.WithTimeout(ctx, time.Second*3)
+	defer ca()
+
+	r, e := repository.New(co).ReadUserLoginDetails(to, p)
+	if e != nil {
+		return "", fmt.Errorf("read user login details ")
+	}
+
+	e = bcrypt.CompareHashAndPassword([]byte(r.Pssword), []byte(password))
+	if e != nil {
+		return "", fmt.Errorf("failed to compare passwords %v", e)
+	}
+
+	return r.Uuid, nil
 }
 
 // Read retrieve user from database by uuid

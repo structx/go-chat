@@ -1,9 +1,9 @@
 
 -- name: InsertUser :one
 -- add user to database
-INSERT INTO users (uuid, usernm, email)
+INSERT INTO users (uuid, usernm, email, pssword)
 VALUES (
-    ?, ?, ?
+    ?, ?, ?, ?
 ) RETURNING *;
 
 -- name: ReadUserDetails :one
@@ -11,6 +11,13 @@ VALUES (
 SELECT usernm, email
 FROM users
 WHERE uuid = ?;
+
+-- name: ReadUserLoginDetails :one
+SELECT uuid, pssword
+FROM users
+WHERE email = ? 
+    OR usernm = ?
+LIMIT 1;
 
 -- name: SearchUserDetails :many
 -- find all users who match search query

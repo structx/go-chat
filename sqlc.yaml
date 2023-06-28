@@ -2,7 +2,7 @@
 version: 2
 sql:
   - engine: sqlite
-    schema: migrations/001_initial_schema.up.sql
+    schema: migrations
     queries: sqlc/queries
     gen:
       go: 
