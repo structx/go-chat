@@ -28,7 +28,6 @@ import (
 func main() {
 
 	fx.New(
-		fx.Provide(context.TODO),
 		fx.Provide(provideLogger),
 		fx.Provide(db.NewSQLite),
 		fx.Provide(domain.NewBundle),
@@ -43,15 +42,17 @@ func main() {
 	).Run()
 }
 
-func provideLogger(ctx context.Context) (*zap.SugaredLogger, context.Context) {
+func provideLogger() (*zap.Logger, context.Context) {
 
 	l := logging.NewLoggerFromEnv()
-	ctx = logging.WithLogger(ctx, l)
+	ctx := logging.WithLogger(context.TODO(), l)
 
-	return l, ctx
+	return l.Desugar(), ctx
 }
 
-func registerHooks(lc fx.Lifecycle, log *zap.SugaredLogger, handler http.Handler, gSrv *port.GrpcServer, sqlite *sql.DB) error {
+func registerHooks(lc fx.Lifecycle, log *zap.Logger, handler http.Handler, gSrv *port.GrpcServer, sqlite *sql.DB) error {
+
+	l := log.Sugar()
 
 	p1 := os.Getenv("HTTP_SERVER_PORT")
 	if p1 == "" {
@@ -85,11 +86,11 @@ func registerHooks(lc fx.Lifecycle, log *zap.SugaredLogger, handler http.Handler
 					return fmt.Errorf("failed to execute database migration %v", e)
 				}
 
-				log.Infof("start http server http://localhost:%s", p1)
+				l.Infof("start http server http://localhost:%s", p1)
 
 				go func() {
 					if e := s1.ListenAndServe(); e != nil {
-						log.Fatalf("failed to start http server %v", e)
+						l.Fatalf("failed to start http server %v", e)
 					}
 				}()
 
@@ -98,11 +99,11 @@ func registerHooks(lc fx.Lifecycle, log *zap.SugaredLogger, handler http.Handler
 					return fmt.Errorf("unable to create network listener %v", e)
 				}
 
-				log.Infof("start gRPC server localhost:%s", p2)
+				l.Infof("start gRPC server localhost:%s", p2)
 
 				go func() {
 					if e := s2.Serve(li); e != nil {
-						log.Fatalf("failed to start gRPC server %v", e)
+						l.Fatalf("failed to start gRPC server %v", e)
 					}
 				}()
 
@@ -116,14 +117,14 @@ func registerHooks(lc fx.Lifecycle, log *zap.SugaredLogger, handler http.Handler
 
 				e = sqlite.Close()
 				if e != nil {
-					log.Errorf("failed to close database connection %v", e)
+					l.Errorf("failed to close database connection %v", e)
 				}
 
 				log.Info("shutdown http server")
 
 				e = s1.Close()
 				if e != nil && !errors.Is(e, http.ErrServerClosed) {
-					log.Errorf("failed to shutdown http server %v", e)
+					l.Errorf("failed to shutdown http server %v", e)
 				}
 
 				log.Info("shutdown gRPC server")
