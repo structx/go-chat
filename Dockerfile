@@ -14,6 +14,6 @@ COPY --from=builder /app/bin/ /app/bin/
 
 COPY migrations /app/migrations
 
-VOLUME [ "/app/sqlite" ]
+VOLUME [ "/app/sqlite", "/app/certs" ]
 
 ENTRYPOINT ["/app/bin/server"]

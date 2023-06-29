@@ -53,6 +53,12 @@ job "chat" {
             read_only = false
         }
 
+        volume "certs" {
+            type = "host"
+            source = "chat-certs"
+            read_only = true
+        }
+
         task "server" {
 
             driver = "docker"
@@ -67,14 +73,19 @@ job "chat" {
                 destination = "/app/sqlite"
             }
 
+            volume_mount {
+                volume = "certs"
+                destination = "/app/certs"
+            }
+
             env {
                 HTTP_SERVER_PORT = "${NOMAD_PORT_http}"
 		        GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
                 SQLITE_DSN = "/app/sqlite/chat.db"
-                SQLITE_MIGRATIONS_DIR = "/app/src/migrations"
+                SQLITE_MIGRATIONS_DIR = "/app/migrations"
                 LOG_LEVEL = "production"
                 ALLOWED_ORIGINS = "https://messenger.structx.io"
-                JWT_PRIVATE_KEY = ""
+                JWT_PRIVATE_KEY = "/app/certs/keyPair.pem"
             }
 
             resources {
