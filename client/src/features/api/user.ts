@@ -1,3 +1,4 @@
+import dotenv from 'dotenv'
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
@@ -47,6 +48,8 @@ export interface DeleteUserRequest {
 export interface DeleteUserResponse {
   message: string
 }
+
+dotenv.config()
 
 export const userApi = createApi({
   baseQuery: fetchBaseQuery({
