@@ -8,7 +8,7 @@
     ],
     "baseUrl": "./",
     "paths": {
-      "path": ["node_modules/path-browserify"]
+      "path": ["node_modules/path-browserify/lib/es5"]
     },
     "allowJs": true,
     "skipLibCheck": true,
