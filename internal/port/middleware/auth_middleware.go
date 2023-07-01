@@ -26,7 +26,7 @@ const (
 // CustomClaims custom JWT claims
 type CustomClaims struct {
 	UserID string `json:"user_id"`
-	jwt.Claims
+	jwt.RegisteredClaims
 }
 
 // Authenticator JWT authenication middleware
@@ -66,13 +66,9 @@ func (a *Authenticator) ValidateJWT(next http.Handler) http.Handler {
 		// get authorization header value
 		h := r.Header.Get("Authorization")
 
-		t, ok := strings.CutPrefix("Bearer: ", h)
-		if !ok {
-			http.Error(w, "invalid auth header", http.StatusBadRequest)
-			return
-		}
+		t := strings.Split(h, "Bearer: ")[1]
 
-		tk, e := jwt.Parse(t, func(token *jwt.Token) (interface{}, error) {
+		tk, e := jwt.ParseWithClaims(t, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 
 			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method %s", token.Header["alg"])
@@ -85,36 +81,11 @@ func (a *Authenticator) ValidateJWT(next http.Handler) http.Handler {
 			return
 		}
 
-		if !tk.Valid {
-			http.Error(w, "token is not valid", http.StatusUnauthorized)
-			return
-		}
-
-		c, ok := tk.Claims.(*CustomClaims)
-		if !ok {
+		if c, ok := tk.Claims.(*CustomClaims); ok && tk.Valid {
+			ctx := context.WithValue(r.Context(), User, c.UserID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		} else {
 			http.Error(w, "invalid claims", http.StatusUnauthorized)
-			return
 		}
-
-		ia, e := c.GetIssuedAt()
-		if e != nil {
-			http.Error(w, "unable to retrieve issued at", http.StatusUnauthorized)
-			return
-		}
-
-		et, e := c.GetExpirationTime()
-		if e != nil {
-			http.Error(w, "unable to retrieve issued at", http.StatusUnauthorized)
-			return
-		}
-
-		// verify token is still valid
-		if ia.Time.After(et.Time) {
-			http.Error(w, "token had expired", http.StatusUnauthorized)
-		}
-
-		ctx := context.WithValue(r.Context(), User, c.UserID)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

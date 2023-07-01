@@ -25,8 +25,8 @@ job "chat" {
             tags = [
                 "traefik.enable=true",
                 "traefik.http.routers.chat.entryPoints=websecure",
-                "traefik.http.routers.health.rule=Host(`chat.structx.io`)",
-                "traefik.http.routers.health.tls=true",
+                "traefik.http.routers.chat.rule=Host(`chat.structx.io`)",
+                "traefik.http.routers.chat.tls=true",
                 "treafik.http.routers.tls.certresolver=myresolver",
                 "http"
             ]

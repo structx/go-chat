@@ -89,7 +89,7 @@ func NewRouter(srv *HTTPServer, auth *mw.Authenticator) *chi.Mux {
 		r.Post("/contact", srv.addContact)
 		r.Get("/contact/search/{search_str}", srv.searchContacts)
 		r.Get("/contact/{contact_id}", srv.fetchContact)
-		r.Get("/contact", srv.listContacts)
+		r.Get("/contact/", srv.listContacts)
 		r.Delete("/contact/{contact_id}", srv.deleteContact)
 
 		r.Post("/conversation", srv.createConversation)
@@ -135,7 +135,7 @@ func (nup *NewUserParams) Bind(_ *http.Request) error {
 
 // NewUserResponse new user response model
 type NewUserResponse struct {
-	*UserPayload `json:"new_user"`
+	*UserPayload `json:"user"`
 }
 
 // UserPayload http user model
@@ -207,19 +207,43 @@ func (h *HTTPServer) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// FetchUserResponse http fetch user response model
+type FetchUserResponse struct {
+	User *UserPayload `json:"user"`
+}
+
+func newFetchUserResponse(user *domain.User) *FetchUserResponse {
+	return &FetchUserResponse{
+		User: &UserPayload{
+			UID:       user.UID.String(),
+			Username:  user.Username,
+			Email:     user.Email,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		},
+	}
+}
+
 func (h *HTTPServer) fetchUser(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
 	sID := chi.URLParam(r, "user_id")
-	UID, e := uuid.Parse(sID)
+	uid, e := uuid.Parse(sID)
 	if e != nil {
 		logging.FromContext(ctx).Errorf("unable to parse request fetch user parameters %v", e)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	u, e := h.bundle.UserService.Read(ctx, UID)
+	// verify jwt token matches user id scope
+	sid := ctx.Value(mw.User)
+	if sid != uid.String() {
+		http.Error(w, "token claims do not match user scope", http.StatusUnauthorized)
+		return
+	}
+
+	u, e := h.bundle.UserService.Read(ctx, uid)
 	if e != nil {
 
 		logging.FromContext(ctx).Errorf("failed to read user %v", e)
@@ -235,7 +259,7 @@ func (h *HTTPServer) fetchUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-	e = json.NewEncoder(w).Encode(newUserResponse(u))
+	e = json.NewEncoder(w).Encode(newFetchUserResponse(u))
 	if e != nil {
 		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
@@ -286,10 +310,14 @@ func (h *HTTPServer) userLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := &mw.CustomClaims{
-		Claims: jwt.RegisteredClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "test",
+			Subject:   "somebody",
+			ID:        "1",
+			Audience:  []string{"somebody_else"},
 		},
 		UserID: uid,
 	}
@@ -417,6 +445,23 @@ func (uup *UpdateUserParams) Bind(_ *http.Request) error {
 	return nil
 }
 
+// UpdateUserResponse http update user response model
+type UpdateUserResponse struct {
+	User *UserPayload `json:"user"`
+}
+
+func newUpdateUserResponse(user *domain.User) *UpdateUserResponse {
+	return &UpdateUserResponse{
+		User: &UserPayload{
+			UID:       user.UID.String(),
+			Username:  user.Username,
+			Email:     user.Email,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		},
+	}
+}
+
 func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
@@ -437,13 +482,18 @@ func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uu := &domain.UpdateUser{
+	// verify jwt token claims match user scope
+	sid := ctx.Value(mw.User)
+	if sid != uid.String() {
+		http.Error(w, "token claims do not match user scope", http.StatusUnauthorized)
+		return
+	}
+
+	u, e := h.bundle.UserService.Update(ctx, &domain.UpdateUser{
 		UID:      uid,
 		Username: p.Username,
 		Email:    p.Email,
-	}
-
-	u, e := h.bundle.UserService.Update(ctx, uu)
+	})
 	if e != nil {
 
 		logging.FromContext(ctx).Errorf("failed to update user %v", e)
@@ -464,7 +514,7 @@ func (h *HTTPServer) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-	e = json.NewEncoder(w).Encode(u)
+	e = json.NewEncoder(w).Encode(newUpdateUserResponse(u))
 	if e != nil {
 		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)

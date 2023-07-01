@@ -10,7 +10,7 @@ job "chat" {
 
         network {
             mode = "bridge"
-
+            hostname = "chat.structx.nomad"
             port "http" {
             }
 
@@ -46,6 +46,12 @@ job "chat" {
             read_only = false
         }
 
+        volume "certs" {
+            type = "host"
+            source = "chat-certs"
+            read_only = true
+        }
+
         task "server" {
 
             driver = "docker"
@@ -60,14 +66,20 @@ job "chat" {
                 destination = "/app/sqlite"
             }
 
+            volume_mount {
+                volume = "certs"
+                destination = "/app/certs"
+                read_only = true
+            }
+
             env {
                 HTTP_SERVER_PORT = "${NOMAD_PORT_http}"
-		        GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
+		GRPC_SERVER_PORT = "${NOMAD_PORT_grpc}"
                 SQLITE_DSN = "/app/sqlite/chat.db"
-                SQLITE_MIGRATIONS_DIR = "/app/src/migrations"
+                SQLITE_MIGRATIONS_DIR = "/app/migrations"
                 LOG_LEVEL = "development"
-                ALLOWED_ORIGINs = "*"
-                JWT_PRIVATE_KEY = ""
+                ALLOWED_ORIGINS = "http://localhost:3000"
+                JWT_PRIVATE_KEY = "/app/certs/keyPair.pem"
             }
 
             resources {

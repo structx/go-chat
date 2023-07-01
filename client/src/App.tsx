@@ -1,19 +1,23 @@
-import React from 'react';
-import './App.css';
+import React from 'react'
 
-import { Box } from '@mui/material';
-import Typography from '@mui/material/Typography';
+import Grid from '@mui/material/Unstable_Grid2'
+import Container from '@mui/material/Container'
 
-function App() {
+import { SignInPage } from './features/users/SiginIn'
+
+export const App = (): JSX.Element => {
   return (
     <div className="App">
-      <Box>
-        <Typography>
-          Site Under Construction
-        </Typography>
-      </Box>
+      <Grid container >
+        <Grid xs display="flex" justifyContent="center" alignItems="center">
+          <Container>
+            <SignInPage />
+          </Container>
+        </Grid>
+      </Grid>
+
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

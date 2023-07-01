@@ -1,7 +1,7 @@
 
 job "messenger" {
 
-    datacenters = ["*"]
+    datacenters = ["us-mountain-1"]
 
     type = "service"
 
@@ -10,7 +10,7 @@ job "messenger" {
 
         network {
             mode = "bridge"
-            hostname = "messenger.structx.docker"
+            hostname = "messenger.structx.io"
             port "http" {
                 to = 80
             }
@@ -19,6 +19,11 @@ job "messenger" {
         service {
             name = "messenger-structx-io"
             tags = [
+                "traefik.enable=true",
+                "traefik.http.routers.messenger.entryPoints=websecure",
+                "traefik.http.routers.messenger.rule=Host(`messenger.structx.io`)",
+                "traefik.http.routers.chat.tls=true",
+                "treafik.http.routers.tls.certresolver=myresolver",
                 "reactjs"
             ]
             port = "http"
