@@ -38,14 +38,11 @@ export const SignInPage = (): JSX.Element => {
       .then((data) => {
         dispatch(setId(data.user_id))
         dispatch(setAccessToken(data.access_token))
-        
         navigate('/profile')
       })
       .catch((err) => {
         return err
       })
-
-    
   }
 
   if (isLoading) {

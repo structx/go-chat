@@ -10,7 +10,7 @@ job "chat" {
 
         network {
             mode = "bridge"
-
+            hostname = "chat.structx.io"
             port "http" {
                 host_network = "private"
             }
@@ -21,12 +21,12 @@ job "chat" {
         }
 
         service {
-            name = "chat-structx-io"
+            name = "chat-api"
             tags = [
                 "traefik.enable=true",
-                "traefik.http.routers.chat.entryPoints=websecure",
-                "traefik.http.routers.chat.rule=Host(`chat.structx.io`)",
-                "traefik.http.routers.chat.tls=true",
+                "traefik.http.routers.chat-api.entryPoints=websecure",
+                "traefik.http.routers.chat-api.rule=Host(`chat.structx.io`)",
+                "traefik.http.routers.chat-api.tls=true",
                 "treafik.http.routers.tls.certresolver=myresolver",
                 "http"
             ]
@@ -44,6 +44,24 @@ job "chat" {
                 path = "/health"
                 interval = "1m"
                 timeout = "10s"
+            }
+        }
+
+        service {
+            name = "chat-grpc"
+            tags = [
+                "traefik.enable=true",
+                "traefik.http.routers.chat-grpc.entryPoints=grpc",
+                "traefik.http.routers.chat-grpc.rule=Host(`chat.structx.io`)",
+                "traefik.http.routers.chat-grpc.tls=true",
+                "treafik.http.routers.tls.certresolver=myresolver",
+                "grpc"
+            ]
+            port = "grpc"
+            provider = "consul"
+
+            connect {
+                sidecar_service {}
             }
         }
 

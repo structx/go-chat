@@ -33,7 +33,7 @@ job "messenger" {
                 sidecar_service {
                     proxy {
                         upstreams {
-                            destination_name = "chat-structx-io"
+                            destination_name = "chat-api"
                             local_bind_port = 9090
                         }
                     }
@@ -52,8 +52,8 @@ job "messenger" {
             }
 
             env {
-                REACT_APP_CHAT_SERVICE_URL = "http://${NOMAD_UPSTREAM_ADDR_chat_structx_io}"
-                REACT_APP_REDUX_STORE_KEY = REDUX_STORE_KEY
+                CHAT_SERVICE_ADDR = "http://${NOMAD_UPSTREAM_ADDR_chat_api}"
+                REDUX_STORE_KEY = REDUX_STORE_KEY
             }
 
             resources {

@@ -10,7 +10,7 @@ import { CssBaseline } from '@mui/material'
 
 import { Provider } from 'react-redux'
 import { PersistGate } from 'redux-persist/integration/react'
-import { setupStore} from './app/store'
+import { setupStore } from './app/store'
 import { persistStore } from 'redux-persist'
 
 const store = setupStore()
