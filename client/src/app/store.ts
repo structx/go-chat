@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import userReducer from '../features/users/userSlice'
 import { userApi } from '../features/api/user'
 
+import { REACT_APP_REDUX_STORE_KEY } from 'src/env'
+
 const rootReducer = combineReducers({
   user: userReducer,
   [userApi.reducerPath]: userApi.reducer
@@ -13,7 +15,7 @@ const rootReducer = combineReducers({
 
 const persistConfig = {
   // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-  key: `${process.env.REACT_APP_REDUX_STORE_KEY}`,
+  key: `${REACT_APP_REDUX_STORE_KEY}`,
   storage: AsyncStorage
 }
 

@@ -19,7 +19,7 @@ job "chat" {
         }
 
         service {
-            name = "chat-structx-io"
+            name = "chat-api"
             tags = [
                 "http"
             ]

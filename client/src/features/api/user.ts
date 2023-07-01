@@ -1,5 +1,5 @@
 
-import dotenv from 'dotenv'
+import { REACT_APP_CHAT_SERVICE_URL } from 'src/env'
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
@@ -50,12 +50,10 @@ export interface DeleteUserResponse {
   message: string
 }
 
-dotenv.config();
-
 export const userApi = createApi({
   baseQuery: fetchBaseQuery({
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    baseUrl: `${process.env.REACT_APP_CHAT_SERVICE_ADDR}/api/v1`,
+    baseUrl: `${REACT_APP_CHAT_SERVICE_URL}/api/v1`,
     mode: 'cors',
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json')
