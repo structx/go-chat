@@ -1,6 +1,4 @@
 
-import { REACT_APP_CHAT_SERVICE_URL } from 'src/env'
-
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
 import type { UpdateUser, NewUser, User } from '../users/types'
@@ -53,7 +51,7 @@ export interface DeleteUserResponse {
 export const userApi = createApi({
   baseQuery: fetchBaseQuery({
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    baseUrl: `${REACT_APP_CHAT_SERVICE_URL}/api/v1`,
+    baseUrl: `${import.meta.env.VITE_CHAT_SERVICE_URL}/api/v1`,
     mode: 'cors',
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json')

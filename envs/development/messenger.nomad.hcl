@@ -47,8 +47,8 @@ job "messenger" {
             }
 
             env {
-                REACT_APP_CHAT_SERVICE_URL = "http://${NOMAD_UPSTREAM_ADDR_chat_api}"
-                REACT_APP_REDUX_STORE_KEY = REDUX_STORE_KEY
+                VITE_CHAT_SERVICE_URL = "http://${NOMAD_UPSTREAM_ADDR_chat_api}"
+                VITE_REDUX_STORE_KEY = REDUX_STORE_KEY
             }
 
             resources {
