@@ -12,11 +12,9 @@ job "chat" {
             mode = "bridge"
             hostname = "chat.structx.io"
             port "http" {
-                host_network = "private"
             }
 
             port "grpc" {
-                host_network = "private"
             }
         }
 
