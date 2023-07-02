@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import userReducer from '../features/users/userSlice'
 import { userApi } from '../features/api/user'
 
-import { REACT_APP_REDUX_STORE_KEY } from 'src/env'
+import { REACT_APP_REDUX_STORE_KEY } from '../env'
 
 const rootReducer = combineReducers({
   user: userReducer,

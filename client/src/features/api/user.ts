@@ -1,5 +1,5 @@
 
-import { REACT_APP_CHAT_SERVICE_URL } from 'src/env'
+import { REACT_APP_CHAT_SERVICE_URL } from '../../env'
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 

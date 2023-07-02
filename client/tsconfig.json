@@ -6,10 +6,6 @@
       "dom.iterable",
       "esnext"
     ],
-    "baseUrl": "./",
-    "paths": {
-      "path": ["node_modules/path-browserify"]
-    },
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,

@@ -3,16 +3,15 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
+COPY package.json package-lock.json ./
+
+RUN npm ci --frozen-lockfile
+
 COPY . .
-RUN npm install --legacy-peer-deps
 
 RUN npm run build
 
-FROM nginx:alpine
-
-RUN rm -rf /usr/share/nginx/html/*
-
-ENV NODE_ENV production
+FROM nginx:1.21-alpine
 
 COPY --from=builder /app/build /usr/share/nginx/html
 
