@@ -79,13 +79,6 @@ func registerHooks(lc fx.Lifecycle, log *zap.Logger, handler http.Handler, gSrv 
 		fx.Hook{
 			OnStart: func(ctx context.Context) error {
 
-				log.Info("execute database migration")
-
-				e := db.MigrateSQLite(sqlite)
-				if e != nil {
-					return fmt.Errorf("failed to execute database migration %v", e)
-				}
-
 				l.Infof("start http server http://localhost:%s", p1)
 
 				go func() {

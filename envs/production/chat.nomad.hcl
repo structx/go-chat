@@ -75,6 +75,20 @@ job "chat" {
             read_only = true
         }
 
+        task "migrate" {
+
+            driver = "docker"
+            
+            config {
+                image = "structx/chat-migrate:v0.1.0"
+            }
+
+            lifecycle {
+                hook = "prestart"
+                sidecar = false
+            }
+        }
+
         task "server" {
 
             driver = "docker"
