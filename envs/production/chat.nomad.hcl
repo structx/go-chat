@@ -5,7 +5,7 @@ job "chat" {
 
     type = "service"
 
-    group "trevatk" {
+    group "structx" {
         count = 1
 
         network {
@@ -94,7 +94,7 @@ job "chat" {
             driver = "docker"
 
             config {
-                image = "trevatk/go-chat:v0.0.1"
+                image = "structx/go-chat:v0.1.0"
                 ports = ["http", "grpc"]
             }
 

@@ -1,5 +1,6 @@
 build:
-	docker build -t trevatk/go-chat:v0.0.1 .
+	docker build -t trevatk/go-chat:v0.1.0  -f ./docker/server.Dockerfile .
+	docker build -t structx/chat-migrate:v0.1.0 -f ./docker/migrate.Dockerfile .
 
 deps:
 	go mod tidy
