@@ -352,25 +352,17 @@ type AddContactPayload struct {
 
 // AddContactParams add contact request model
 type AddContactParams struct {
-	*domain.NewContact
-	*AddContactPayload `json:"add_contact"`
+	NewContact *AddContactPayload `json:"new_contact"`
 }
 
 // Bind parse request into new contact model
 func (adp *AddContactParams) Bind(_ *http.Request) error {
 
-	oID, e := uuid.Parse(adp.AddContactPayload.Owner)
-	if e != nil {
+	if len(adp.NewContact.Owner) < 36 {
 		return errors.New("invalid owner parameter")
-	}
-
-	rID, e := uuid.Parse(adp.AddContactPayload.Recipient)
-	if e != nil {
+	} else if len(adp.NewContact.Recipient) < 36 {
 		return errors.New("invalid recipient parameter")
 	}
-
-	adp.NewContact.Owner = oID
-	adp.NewContact.Recipient = rID
 
 	return nil
 }
@@ -384,7 +376,17 @@ type ContactPayload struct {
 
 // AddContactResponse add contact response model
 type AddContactResponse struct {
-	*ContactPayload
+	Payload *ContactPayload `json:"contact"`
+}
+
+func newAddContactResponse(contact *domain.Contact) *AddContactResponse {
+	return &AddContactResponse{
+		Payload: &ContactPayload{
+			UUID:      contact.UID.String(),
+			Owner:     contact.Owner.String(),
+			Recipient: contact.Recipient.String(),
+		},
+	}
 }
 
 func (h *HTTPServer) addContact(w http.ResponseWriter, r *http.Request) {
@@ -399,7 +401,23 @@ func (h *HTTPServer) addContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, e := h.bundle.ContactService.Create(ctx, p.NewContact)
+	oID, e := uuid.Parse(p.NewContact.Owner)
+	if e != nil {
+		logging.FromContext(ctx).Errorf("failed to parse owner uuid %v", e)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	rID, e := uuid.Parse(p.NewContact.Recipient)
+	if e != nil {
+		logging.FromContext(ctx).Errorf("failed to parse recipient uuid %v", e)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+	}
+
+	c, e := h.bundle.ContactService.Create(ctx, &domain.NewContact{
+		Owner:     oID,
+		Recipient: rID,
+	})
 	if e != nil {
 		logging.FromContext(ctx).Errorf("failed to add new contact %v", e)
 		http.Error(w, "failed to add new contact", http.StatusInternalServerError)
@@ -407,7 +425,7 @@ func (h *HTTPServer) addContact(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	e = json.NewEncoder(w).Encode(newContactResponse(c))
+	e = json.NewEncoder(w).Encode(newAddContactResponse(c))
 	if e != nil {
 		logging.FromContext(ctx).Errorf("unable to encode response %v", e)
 		http.Error(w, "unable to encode response", http.StatusInternalServerError)
@@ -969,15 +987,5 @@ func (h *HTTPServer) health(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logging.FromContext(ctx).Errorf("error encoding health check response %v", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-	}
-}
-
-func newContactResponse(contact *domain.Contact) *AddContactResponse {
-	return &AddContactResponse{
-		ContactPayload: &ContactPayload{
-			UUID:      contact.UID.String(),
-			Owner:     contact.Owner.String(),
-			Recipient: contact.Recipient.String(),
-		},
 	}
 }
