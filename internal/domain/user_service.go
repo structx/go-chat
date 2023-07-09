@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -80,7 +81,7 @@ func (us *UserService) Create(ctx context.Context, newUser *NewUser) (*User, err
 		Uuid:    uid.String(),
 		Usernm:  newUser.Username,
 		Email:   newUser.Email,
-		Pssword: string(p),
+		Pssword: hex.EncodeToString(p),
 	})
 	if e != nil {
 
