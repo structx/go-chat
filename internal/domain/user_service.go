@@ -133,7 +133,12 @@ func (us *UserService) Login(ctx context.Context, username, password string) (st
 		return "", fmt.Errorf("read user login details ")
 	}
 
-	e = bcrypt.CompareHashAndPassword([]byte(r.Pssword), []byte(password))
+	ps, e := hex.DecodeString(r.Pssword)
+	if e != nil {
+		return "", fmt.Errorf("unable to decode string %v", e)
+	}
+
+	e = bcrypt.CompareHashAndPassword(ps, []byte(password))
 	if e != nil {
 		return "", fmt.Errorf("failed to compare passwords %v", e)
 	}

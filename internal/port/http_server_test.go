@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -213,15 +214,38 @@ func (s *HTTPServerSuite) TestCreateContact() {
 
 	for _, c := range cases {
 
-		bb, e := json.Marshal(c.params)
+		rb, e := json.Marshal(&port.UserLoginRequest{
+			Username: "user1",
+			Password: "test123",
+		})
 		a.NoError(e)
 
-		rq, e := http.NewRequest(http.MethodPost, "/api/v1/contact", bytes.NewReader(bb))
+		rq, e := http.NewRequest(http.MethodPost, "/api/v1/user/login", bytes.NewBuffer(rb))
 		a.NoError(e)
 
 		rq.Header.Add("Content-Type", "application/json")
 
 		rr := httptest.NewRecorder()
+
+		s.mux.ServeHTTP(rr, rq)
+
+		b, e := io.ReadAll(rr.Body)
+		a.NoError(e)
+
+		var r port.UserLoginResponse
+		e = json.Unmarshal(b, &r)
+		a.NoError(e)
+
+		bb, e := json.Marshal(c.params)
+		a.NoError(e)
+
+		rq, e = http.NewRequest(http.MethodPost, "/api/v1/contact", bytes.NewReader(bb))
+		a.NoError(e)
+
+		rq.Header.Add("Content-Type", "application/json")
+		rq.Header.Add("Authorization", fmt.Sprintf("Bearer: %s", r.Token))
+
+		rr = httptest.NewRecorder()
 
 		s.mux.ServeHTTP(rr, rq)
 
